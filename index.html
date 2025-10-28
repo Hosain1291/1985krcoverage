@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1985년 개표방송 시뮬레이터</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: VT323 (CRT) -->
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    
+    <style>
+        /* BookkMyungjo 폰트 (명조) */
+        @font-face {
+            font-family: 'BookkMyungjo';
+            src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2302@1.0/BookkMyungjo-Lt.woff2') format('woff2');
+            font-weight: 400;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'BookkMyungjo';
+            src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2302@1.0/BookkMyungjo-Bd.woff2') format('woff2');
+            font-weight: 700;
+            font-display: swap;
+        }
+
+        /* Isamanru 폰트 (굴림 느낌) */
+        @font-face {
+            font-family: 'Isamanru';
+            src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_20-10@1.0/GongGothicLight.woff') format('woff');
+            font-weight: 300;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Isamanru';
+            src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_20-10@1.0/GongGothicMedium.woff') format('woff');
+            font-weight: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Isamanru';
+            src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_20-10@1.0/GongGothicBold.woff') format('woff');
+            font-weight: 700;
+            font-display: swap;
+        }
+
+        .font-vt323 { font-family: 'VT323', monospace; }
+        .font-isamanru { font-family: 'Isamanru', sans-serif; }
+        .font-myungjo { font-family: 'BookkMyungjo', serif; }
+
+        body { font-family: 'Isamanru', sans-serif; }
+
+        /* --- CRT 모니터 스타일 --- */
+        .crt-monitor {
+            background-color: #E0D8B0;
+            border: 1px solid #A09870;
+            box-shadow: 10px 10px 20px rgba(0,0,0,0.3), 
+                        inset 5px 5px 10px rgba(255,255,255,0.5),
+                        inset -5px -5px 10px rgba(0,0,0,0.2);
+        }
+        .crt-screen {
+            background-color: #0A0A0A;
+            border: 4px solid #333;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.7);
+            color: #33FF33;
+            text-shadow: 0 0 3px #33FF33;
+            font-family: 'VT323', monospace;
+        }
+        .crt-screen input, .crt-screen button {
+            background-color: #111;
+            border: 1px solid #33FF33;
+            color: #33FF33;
+            padding: 4px 8px;
+            text-shadow: 0 0 3px #33FF33;
+            font-family: 'VT323', monospace;
+        }
+        .crt-screen button:hover {
+            background-color: #33FF33;
+            color: #0A0A0A;
+            text-shadow: none;
+        }
+        .crt-screen label { text-transform: uppercase; }
+
+        /* --- 1985년 방송 화면 스타일 (VHS 효과 포함) --- */
+        .broadcast-screen {
+            background-color: #3B3F3B;
+            color: #FFFFFF;
+            aspect-ratio: 4 / 3;
+            overflow: hidden; 
+            position: relative;
+            border: 10px solid #1a1a1a;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            text-shadow: 2px 2px 2px rgba(0, 0, 0, 0.7); 
+            font-family: 'Isamanru', sans-serif;
+            font-weight: 700;
+            /* vhs-jitter 제거, 깜빡임(flicker)만 남김 */
+            animation: flicker 0.15s infinite;
+        }
+
+        /* 스캔라인 (z-index: 1) */
+        .broadcast-screen::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(20, 20, 20, 0.1) 50%, transparent 50%);
+            background-size: 100% 4px;
+            opacity: 0.3;
+            pointer-events: none;
+            z-index: 1; 
+            animation: vhs-scanline-move 0.2s linear infinite;
+        }
+        
+        /* VHS 노이즈 (z-index: 0) */
+        .broadcast-screen::after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            /* SVG를 사용한 인라인 노이즈 텍스처 */
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='0.2'/%3E%3C/svg%3E");
+            opacity: 0.15;
+            animation: vhs-static-overlay 0.1s infinite;
+            pointer-events: none;
+            z-index: 0; /* 제일 뒤에 */
+        }
+        
+        /* --- VHS 애니메이션 키프레임 --- */
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.95; }
+        }
+        @keyframes vhs-scanline-move {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(10px); }
+        }
+        @keyframes vhs-static-overlay {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 100% 100%; }
+        }
+        /* vhs-jitter 키프레임 삭제됨 */
+
+        /* --- 텍스트 스타일 --- */
+        .broadcast-title-blue { color: #99CCFF; } /* 시/도 (하늘색) */
+        .broadcast-title-green { color: #99FF99; } /* 선거구 (초록색) */
+        .broadcast-party { color: #DDDDDD; } /* 정당 (옅은 회색, 3위 이하) */
+        
+        .broadcast-time { 
+            color: #99FF99; /* 시간 (초록색) */
+            text-shadow: 2px 2px 2px #000; /* 검은색 그림자 */
+            position: relative;
+            z-index: 2; /* VHS 노이즈 위에 표시 */
+        }
+
+        /* 당선인 랭킹 색상 */
+        .rank-winner { color: #FFFF99; } /* 1, 2위 (노란색) */
+        .rank-other { color: #FFFFFF; } /* 3+위 (흰색) */
+        
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen p-4 sm:p-8">
+
+    <div class="container mx-auto max-w-7xl">
+        <div class="flex flex-col lg:flex-row gap-8">
+
+            <!-- 왼쪽: CRT 입력 패널 -->
+            <div class="w-full lg:w-1/3">
+                <div class="crt-monitor p-4 sm:p-8 rounded-lg">
+                    <div class="crt-screen p-6 rounded text-lg sm:text-xl">
+                        <h1 class="text-3xl sm:text-4xl mb-6 text-center">KBC-1985 GENERATOR</h1>
+                        
+                        <div class="mb-4">
+                            <label for="constituency-input" class="block mb-1">> Constituency</label>
+                            <input type="text" id="constituency-input" class="w-full rounded-none" value="충남 천안·아산·천원">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="block mb-2">> Candidates</label>
+                            <div id="candidate-list" class="space-y-3">
+                                <!-- 예시 후보자들 -->
+                                <div class="candidate-row flex items-center gap-2">
+                                    <input type="text" placeholder="이름" class="name-input w-1/3 rounded-none" value="정채원">
+                                    <input type="text" placeholder="정당" class="party-input w-1/3 rounded-none" value="민한">
+                                    <input type="number" placeholder="득표" class="votes-input w-1/4 rounded-none" value="367">
+                                    <button class="remove-btn text-red-500 hover:text-red-400 font-bold" onclick="removeCandidate(this)">X</button>
+                                </div>
+                                <div class="candidate-row flex items-center gap-2">
+                                    <input type="text" placeholder="이름" class="name-input w-1/3 rounded-none" value="정선호">
+                                    <input type="text" placeholder="정당" class="party-input w-1/3 rounded-none" value="민정">
+                                    <input type="number" placeholder="득표" class="votes-input w-1/4 rounded-none" value="323">
+                                    <button class="remove-btn text-red-500 hover:text-red-400 font-bold" onclick="removeCandidate(this)">X</button>
+                                </div>
+                                <div class="candidate-row flex items-center gap-2">
+                                    <input type="text" placeholder="이름" class="name-input w-1/3 rounded-none" value="황명수">
+                                    <input type="text" placeholder="정당" class="party-input w-1/3 rounded-none" value="신한">
+                                    <input type="number" placeholder="득표" class="votes-input w-1/4 rounded-none" value="176">
+                                    <button class="remove-btn text-red-500 hover:text-red-400 font-bold" onclick="removeCandidate(this)">X</button>
+                                </div>
+                            </div>
+                            <button id="add-candidate-btn" class="w-full mt-3 rounded-none text-sm">+ ADD CANDIDATE +</button>
+                        </div>
+
+                        <div class="mb-6">
+                            <label for="time-input" class="block mb-1">> Time</label>
+                            <input type="text" id="time-input" class="w-full rounded-none" value="20:30">
+                        </div>
+
+                        <button id="generate-btn" class="w-full text-2xl py-2 rounded-none">> GENERATE BROADCAST <</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 오른쪽: 1985 개표방송 화면 -->
+            <div class="w-full lg:w-2/3 flex justify-center items-start">
+                <div id="broadcast-output" class="broadcast-screen w-full max-w-3xl p-8 sm:p-12 flex flex-col justify-between">
+                    
+                    <!-- 상단: 선거구명 (z-index 2) -->
+                    <div class="text-center" style="position: relative; z-index: 2;">
+                        <h2 id="broadcast-title" class="text-3xl sm:text-4xl font-bold">
+                            <!-- JS로 내용 채워짐 -->
+                        </h2>
+                    </div>
+
+                    <!-- 중단: 개표 현황 (z-index 2) -->
+                    <div class="flex-grow mt-8 sm:mt-12" style="position: relative; z-index: 2;">
+                        <table class="w-full text-left">
+                            <thead id="broadcast-header" class="text-white font-bold text-2xl sm:text-3xl">
+                                <tr>
+                                    <!-- 간격: 50% / 25% / 25% -->
+                                    <th class="pb-4 w-1/2"></th>
+                                    <th class="pb-4 w-1/4"></th>
+                                    <th class="pb-4 w-1/4 text-right"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="broadcast-table-body" class="text-2xl sm:text-3xl">
+                                <!-- JS로 내용 채워짐 -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 하단: 시각 (broadcast-time 클래스에 z-index 2 적용됨) -->
+                    <div class="text-center">
+                        <p id="broadcast-time" class="text-xl sm:text-2xl broadcast-time">
+                            <!-- JS로 내용 채워짐 -->
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 전역 변수 (애니메이션 제어용) ---
+        let animationQueue = [];
+        let isAnimating = false;
+        let currentAnimationTimeout = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const generateBtn = document.getElementById('generate-btn');
+            const addCandidateBtn = document.getElementById('add-candidate-btn');
+            const candidateList = document.getElementById('candidate-list');
+
+            // '후보 추가' 버튼
+            addCandidateBtn.addEventListener('click', () => {
+                const newRow = document.createElement('div');
+                newRow.className = 'candidate-row flex items-center gap-2';
+                newRow.innerHTML = `
+                    <input type="text" placeholder="이름" class="name-input w-1/3 rounded-none">
+                    <input type="text" placeholder="정당" class="party-input w-1/3 rounded-none">
+                    <input type="number" placeholder="득표" class="votes-input w-1/4 rounded-none">
+                    <button class="remove-btn text-red-500 hover:text-red-400 font-bold" onclick="removeCandidate(this)">X</button>
+                `;
+                candidateList.appendChild(newRow);
+            });
+
+            // '방송 생성' 버튼
+            generateBtn.addEventListener('click', generateBroadcast);
+            
+            // 초기 로드 시 한 번 실행
+            generateBroadcast(); 
+        });
+
+        // 'X' 버튼 (후보 제거)
+        function removeCandidate(button) {
+            button.parentElement.remove();
+        }
+
+        /**
+         * 타이핑 효과 함수
+         * @param {HTMLElement} element - 텍스트를 표시할 HTML 요소
+         * @param {string} text - 표시할 전체 텍스트
+         * @param {function} onComplete - 타이핑 완료 시 호출될 콜백 함수
+         */
+        function typeText(element, text, onComplete) {
+            let i = 0;
+            element.innerHTML = '';
+            
+            function type() {
+                if (!isAnimating) return; // 중단 신호
+                if (i < text.length) {
+                    element.innerHTML += text.charAt(i);
+                    i++;
+                    currentAnimationTimeout = setTimeout(type, 50); // 타이핑 속도
+                } else {
+                    if (onComplete) onComplete();
+                }
+            }
+            type();
+        }
+
+        /**
+         * 애니메이션 큐를 순차적으로 처리하는 함수
+         */
+        function processAnimationQueue() {
+            if (animationQueue.length === 0) {
+                isAnimating = false;
+                return;
+            }
+
+            isAnimating = true;
+            const item = animationQueue.shift();
+            
+            typeText(item.element, item.text, () => {
+                // 다음 아이템으로 재귀 호출
+                processAnimationQueue(); 
+            });
+        }
+
+        /**
+         * 메인 함수: 방송 화면 생성
+         */
+        function generateBroadcast() {
+            // 0. 기존 애니메이션 중단
+            isAnimating = false;
+            if (currentAnimationTimeout) {
+                clearTimeout(currentAnimationTimeout);
+                currentAnimationTimeout = null;
+            }
+            animationQueue = [];
+
+            // 1. 엘리먼트 선택
+            const titleEl = document.getElementById('broadcast-title');
+            const headerRow = document.querySelector('#broadcast-header tr');
+            const headerCells = headerRow.querySelectorAll('th');
+            const tableBody = document.getElementById('broadcast-table-body');
+            const timeEl = document.getElementById('broadcast-time');
+
+            // 2. 내용 리셋 (타이핑 전)
+            headerCells.forEach(cell => cell.innerHTML = '');
+            tableBody.innerHTML = '';
+            timeEl.innerHTML = '';
+
+            // 3. 입력값 가져오기
+            const constituencyInput = document.getElementById('constituency-input').value;
+            const timeInput = document.getElementById('time-input').value;
+            const candidateRows = document.querySelectorAll('#candidate-list .candidate-row');
+
+            // 4. 후보자 데이터 수집 및 정렬
+            let candidates = [];
+            candidateRows.forEach(row => {
+                const name = row.querySelector('.name-input').value;
+                const party = row.querySelector('.party-input').value;
+                const votes = parseInt(row.querySelector('.votes-input').value) || 0;
+                if (name) {
+                    candidates.push({ name, party, votes });
+                }
+            });
+            candidates.sort((a, b) => b.votes - a.votes); // 득표수 내림차순 정렬
+
+            // 5. 선거구명 즉시 표시 (애니메이션 없음)
+            let styledTitle = '';
+            let separatorIndex = constituencyInput.indexOf(' ');
+            let separatorChar = ' ';
+            if (separatorIndex === -1) {
+                separatorIndex = constituencyInput.indexOf('·');
+                separatorChar = '·';
+            }
+            if (separatorIndex !== -1) {
+                const sido = constituencyInput.substring(0, separatorIndex);
+                const seongeogu = constituencyInput.substring(separatorIndex + 1); 
+                let separatorHtml = (separatorChar === ' ') ? ' ' : '<span class="text-white mx-1">·</span>';
+                styledTitle = `<span class="broadcast-title-blue">${sido}</span>${separatorHtml}<span class="broadcast-title-green">${seongeogu}</span>`;
+            } else {
+                styledTitle = `<span class="broadcast-title-green">${constituencyInput}</span>`;
+            }
+            titleEl.innerHTML = styledTitle;
+
+            // 6. 타이핑할 항목을 요청하신 순서대로 큐에 추가
+            
+            // 순서 1, 2, 3: 헤더
+            animationQueue.push({ element: headerCells[0], text: '후보자' });
+            animationQueue.push({ element: headerCells[1], text: '정당' });
+            animationQueue.push({ element: headerCells[2], text: '득표수' });
+
+            // 순서 4, 5, 6, 7...: 후보자 (1위, 2위, 3위, 그외 "따로따로")
+            candidates.forEach((c, index) => {
+                // 1, 2위는 'rank-winner' (노란색), 3위 이하는 'rank-other' (흰색)
+                const rankClass = (index === 0 || index === 1) ? 'rank-winner' : 'rank-other';
+                // 1, 2위 정당은 'rank-winner' (노란색), 3위 이하는 'broadcast-party' (회색)
+                const partyRankClass = (index === 0 || index === 1) ? 'rank-winner' : 'broadcast-party';
+                
+                const row = document.createElement('tr');
+                
+                // 간격: 60% / 0% / 0%
+                // 폰트: 이름(font-myungjo), 정당(font-myungjo)
+                row.innerHTML = `
+                    <td class="py-2 font-bold text-3xl sm:text -4xl ${rankClass} font-myungjo w-1/2"></td>
+                    <td class="py-2 ${partyRankClass} w-1/4 font-myungjo"></td>
+                    <td class="py-2 ${rankClass} text-right font-bold w-1/4"></td>
+                `;
+                tableBody.appendChild(row);
+
+                // 큐에 후보자 정보 추가 (이름, 정당, 득표수 순서)
+                const cells = row.querySelectorAll('td');
+                animationQueue.push({ element: cells[0], text: c.name });
+                animationQueue.push({ element: cells[1], text: c.party });
+                animationQueue.push({ element: cells[2], text: c.votes.toLocaleString() });
+            });
+
+            // 순서 8 (마지막): 시간
+            animationQueue.push({ element: timeEl, text: `-------------- ${timeInput} 현재` });
+
+            // 7. 애니메이션 큐 실행
+            processAnimationQueue();
+        }
+    </script>
+
+</body>
+</html>
+
